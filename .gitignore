@@ -1,0 +1,9 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+outputs/
+models/
+*.pt
+*.mp4
+temp_audio.wav
