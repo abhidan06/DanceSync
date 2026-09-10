@@ -1,4 +1,4 @@
-"""Run a descriptive group pose-agreement baseline on one video."""
+"""Run pose agreement on one video or a directory of MP4 videos."""
 import argparse
 import csv
 from datetime import datetime
@@ -16,6 +16,22 @@ from pose import draw_poses, extract_poses
 from synchronization import frame_disagreement
 
 ROOT = Path(__file__).resolve().parent
+
+
+def video_jobs(source, output):
+    """Resolve inputs before processing; directory runs get one folder per file."""
+    if source.is_file():
+        return [(source, output)]
+    if not source.is_dir():
+        raise ValueError(f"Input does not exist: {source}")
+    videos = sorted((p for p in source.iterdir() if p.is_file() and p.suffix.lower() == ".mp4"),
+                    key=lambda p: p.name.lower())
+    if not videos:
+        raise ValueError(f"No MP4 videos found in {source}")
+    names = [p.stem.lower() for p in videos]
+    if len(names) != len(set(names)):
+        raise ValueError("Video names must have unique stems for separate output folders")
+    return [(video, output / video.stem) for video in videos]
 
 
 def analyze(video, weights, output, max_frames=None):
@@ -84,15 +100,22 @@ def analyze(video, weights, output, max_frames=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("video", nargs="?", type=Path, default=ROOT / "data/raw/input_dance_video.mp4")
+    parser.add_argument("video", nargs="?", type=Path, default=ROOT / "data/raw",
+                        help="Video file or directory of MP4 files (default: data/raw)")
     parser.add_argument("--weights", type=Path, default=ROOT / "yolov8n.pt")
-    parser.add_argument("--output", type=Path, default=ROOT / "outputs" / datetime.now().strftime("%Y%m%d-%H%M%S"))
-    parser.add_argument("--max-frames", type=int, help="Optional prefix for a smoke test")
+    parser.add_argument("--output", type=Path, help="New output directory; directory inputs get per-video subfolders")
+    parser.add_argument("--max-frames", type=int, help="Optional frame limit per video for a smoke test")
     args = parser.parse_args()
     if args.max_frames is not None and args.max_frames <= 0:
         parser.error("--max-frames must be positive")
     try:
-        analyze(args.video, args.weights, args.output, args.max_frames)
+        output = args.output or ROOT / "outputs" / datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        jobs = video_jobs(args.video, output)
+        if output.exists():
+            raise ValueError(f"Output directory already exists: {output}")
+        for video, destination in jobs:
+            print(f"Processing {video.name} -> {destination}", flush=True)
+            analyze(video, args.weights, destination, args.max_frames)
     except (ValueError, RuntimeError, FileExistsError) as error:
         parser.exit(1, f"Error: {error}\n")
 

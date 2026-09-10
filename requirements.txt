@@ -1,6 +1,10 @@
-# Python 3.10; supplied environment versions, not a full transitive lockfile.
+# Python 3.10. Pin the inference stack used for the recorded runs.
 numpy==1.26.4
 opencv-contrib-python==4.11.0.86
+# Ultralytics requires the base wheel; keep both cv2 providers at the same version.
+opencv-python==4.11.0.86
 mediapipe==0.10.21
 ultralytics==8.3.183
 matplotlib==3.10.5
+torch==2.8.0
+torchvision==0.23.0
